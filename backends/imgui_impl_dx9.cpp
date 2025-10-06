@@ -38,6 +38,7 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_dx9.h"
+#include "texids.h"
 
 // DirectX data
 struct ImGui_ImplDX9_Data
@@ -48,6 +49,7 @@ struct ImGui_ImplDX9_Data
     LPDIRECT3DTEXTURE9          FontTexture;
     int                         VertexBufferSize;
     int                         IndexBufferSize;
+    IDirect3DTexture9*          TexIDs[TEXID_LAST];
 
     ImGui_ImplDX9_Data()        { memset((void*)this, 0, sizeof(*this)); VertexBufferSize = 5000; IndexBufferSize = 10000; }
 };
@@ -259,7 +261,7 @@ void ImGui_ImplDX9_RenderDrawData(ImDrawData* draw_data)
 
                 // Apply Scissor/clipping rectangle, Bind texture, Draw
                 const RECT r = { (LONG)clip_min.x, (LONG)clip_min.y, (LONG)clip_max.x, (LONG)clip_max.y };
-                const LPDIRECT3DTEXTURE9 texture = (LPDIRECT3DTEXTURE9)pcmd->GetTexID();
+                const LPDIRECT3DTEXTURE9 texture = bd->TexIDs[pcmd->GetTexID()];
                 bd->pd3dDevice->SetTexture(0, texture);
                 bd->pd3dDevice->SetScissorRect(&r);
                 bd->pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, pcmd->VtxOffset + global_vtx_offset, 0, (UINT)cmd_list->VtxBuffer.Size, pcmd->IdxOffset + global_idx_offset, pcmd->ElemCount / 3);
@@ -293,6 +295,8 @@ bool ImGui_ImplDX9_Init(IDirect3DDevice9* device)
 
     bd->pd3dDevice = device;
     bd->pd3dDevice->AddRef();
+    
+    memset(bd->TexIDs, 0, sizeof bd->TexIDs);
 
     return true;
 }
@@ -391,7 +395,7 @@ void ImGui_ImplDX9_InvalidateDeviceObjects()
     if (bd->FontTexture) { bd->FontTexture->Release(); bd->FontTexture = nullptr; }
 }
 
-IDirect3DTexture9* ImGui_ImplDX9_getFontTexture() {
+IDirect3DTexture9* ImGui_ImplDX9_GetFontTexture() {
     ImGui_ImplDX9_Data* bd = ImGui_ImplDX9_GetBackendData();
     if (!bd)
         return nullptr;
@@ -405,6 +409,13 @@ void ImGui_ImplDX9_NewFrame()
 
     if (!bd->FontTexture)
         ImGui_ImplDX9_CreateDeviceObjects();
+}
+
+void ImGui_ImplDX9_AssignTexID(ImTextureID id, IDirect3DTexture9* texture) {
+    ImGui_ImplDX9_Data* bd = ImGui_ImplDX9_GetBackendData();
+    if (!bd)
+        return;
+    bd->TexIDs[id] = texture;
 }
 
 //-----------------------------------------------------------------------------

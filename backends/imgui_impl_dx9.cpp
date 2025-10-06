@@ -39,9 +39,6 @@
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_dx9.h"
 
-// DirectX
-#include <d3d9.h>
-
 // DirectX data
 struct ImGui_ImplDX9_Data
 {
@@ -366,9 +363,6 @@ static bool ImGui_ImplDX9_CreateFontsTexture()
         memcpy((unsigned char*)tex_locked_rect.pBits + (size_t)tex_locked_rect.Pitch * y, pixels + (size_t)width * bytes_per_pixel * y, (size_t)width * bytes_per_pixel);
     bd->FontTexture->UnlockRect(0);
 
-    // Store our identifier
-    io.Fonts->SetTexID((ImTextureID)bd->FontTexture);
-
 #ifndef IMGUI_USE_BGRA_PACKED_COLOR
     if (!rgba_support && io.Fonts->TexPixelsUseColors)
         ImGui::MemFree(pixels);
@@ -394,7 +388,14 @@ void ImGui_ImplDX9_InvalidateDeviceObjects()
         return;
     if (bd->pVB) { bd->pVB->Release(); bd->pVB = nullptr; }
     if (bd->pIB) { bd->pIB->Release(); bd->pIB = nullptr; }
-    if (bd->FontTexture) { bd->FontTexture->Release(); bd->FontTexture = nullptr; ImGui::GetIO().Fonts->SetTexID(0); } // We copied bd->pFontTextureView to io.Fonts->TexID so let's clear that as well.
+    if (bd->FontTexture) { bd->FontTexture->Release(); bd->FontTexture = nullptr; }
+}
+
+IDirect3DTexture9* ImGui_ImplDX9_getFontTexture() {
+    ImGui_ImplDX9_Data* bd = ImGui_ImplDX9_GetBackendData();
+    if (!bd)
+        return nullptr;
+    return bd->FontTexture;
 }
 
 void ImGui_ImplDX9_NewFrame()

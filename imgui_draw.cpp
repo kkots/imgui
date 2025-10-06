@@ -173,6 +173,8 @@ using namespace IMGUI_STB_NAMESPACE;
 // [SECTION] Style functions
 //-----------------------------------------------------------------------------
 
+bool ImGui::imGuiTextOutlined = false;
+
 void ImGui::StyleColorsDark(ImGuiStyle* dst)
 {
     ImGuiStyle* style = dst ? dst : &ImGui::GetStyle();
@@ -2399,7 +2401,7 @@ static const ImVec2 FONT_ATLAS_DEFAULT_TEX_CURSOR_DATA[ImGuiMouseCursor_COUNT][3
 ImFontAtlas::ImFontAtlas()
 {
     memset(this, 0, sizeof(*this));
-    TexGlyphPadding = 1;
+    TexGlyphPadding = 3;//1;
     PackIdMouseCursors = PackIdLines = -1;
 }
 
@@ -3022,7 +3024,10 @@ static bool ImFontAtlasBuildWithStbTruetype(ImFontAtlas* atlas)
             float y0 = q.y0 * inv_rasterization_scale + font_off_y;
             float x1 = q.x1 * inv_rasterization_scale + font_off_x;
             float y1 = q.y1 * inv_rasterization_scale + font_off_y;
-            dst_font->AddGlyph(&cfg, (ImWchar)codepoint, x0, y0, x1, y1, q.s0, q.t0, q.s1, q.t1, pc.xadvance * inv_rasterization_scale);
+            dst_font->AddGlyph(&cfg, (ImWchar)codepoint, x0, y0, x1, y1, q.s0, q.t0, q.s1, q.t1,
+                                                         x0 - 1.F, y0 - 1.F, x1 + 1.F, y1 + 1.F,
+                                                         q.s0Outlined, q.t0Outlined, q.s1Outlined, q.t1Outlined,
+                                                         pc.xadvance * inv_rasterization_scale);
         }
     }
 
@@ -3257,7 +3262,14 @@ void ImFontAtlasBuildFinish(ImFontAtlas* atlas)
         IM_ASSERT(r->Font->ContainerAtlas == atlas);
         ImVec2 uv0, uv1;
         atlas->CalcCustomRectUV(r, &uv0, &uv1);
-        r->Font->AddGlyph(NULL, (ImWchar)r->GlyphID, r->GlyphOffset.x, r->GlyphOffset.y, r->GlyphOffset.x + r->Width, r->GlyphOffset.y + r->Height, uv0.x, uv0.y, uv1.x, uv1.y, r->GlyphAdvanceX);
+        
+        ImVec2 uv0Outlined = ImVec2((float)(r->X - 1.F) * atlas->TexUvScale.x, (float)(r->Y - 1.F) * atlas->TexUvScale.y);
+        ImVec2 uv1Outlined = ImVec2((float)(r->X + r->Width + 1.F) * atlas->TexUvScale.x, (float)(r->Y + r->Height + 1.F) * atlas->TexUvScale.y);
+        
+        r->Font->AddGlyph(NULL, (ImWchar)r->GlyphID, r->GlyphOffset.x, r->GlyphOffset.y, r->GlyphOffset.x + r->Width, r->GlyphOffset.y + r->Height, uv0.x, uv0.y, uv1.x, uv1.y,
+                                r->GlyphOffset.x - 1.F, r->GlyphOffset.y - 1.F, r->GlyphOffset.x + r->Width + 1.F, r->GlyphOffset.y + r->Height + 1.F,
+                                uv0Outlined.x, uv0Outlined.y, uv1Outlined.x, uv1Outlined.y,
+                                r->GlyphAdvanceX);
     }
 
     // Build all fonts lookup tables
@@ -3736,7 +3748,10 @@ void ImFont::GrowIndex(int new_size)
 // x0/y0/x1/y1 are offset from the character upper-left layout position, in pixels. Therefore x0/y0 are often fairly close to zero.
 // Not to be mistaken with texture coordinates, which are held by u0/v0/u1/v1 in normalized format (0.0..1.0 on each texture axis).
 // 'cfg' is not necessarily == 'this->ConfigData' because multiple source fonts+configs can be used to build one target font.
-void ImFont::AddGlyph(const ImFontConfig* cfg, ImWchar codepoint, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, float advance_x)
+void ImFont::AddGlyph(const ImFontConfig* cfg, ImWchar codepoint, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1,
+                                                                  float x0Outlined, float y0Outlined, float x1Outlined, float y1Outlined,
+                                                                  float u0Outlined, float v0Outlined, float u1Outlined, float v1Outlined,
+                                                                  float advance_x)
 {
     if (cfg != NULL)
     {
@@ -3771,6 +3786,14 @@ void ImFont::AddGlyph(const ImFontConfig* cfg, ImWchar codepoint, float x0, floa
     glyph.V0 = v0;
     glyph.U1 = u1;
     glyph.V1 = v1;
+    glyph.X0Outlined = x0Outlined;
+    glyph.Y0Outlined = y0Outlined;
+    glyph.X1Outlined = x1Outlined;
+    glyph.Y1Outlined = y1Outlined;
+    glyph.U0Outlined = u0Outlined;
+    glyph.V0Outlined = v0Outlined;
+    glyph.U1Outlined = u1Outlined;
+    glyph.V1Outlined = v1Outlined;
     glyph.AdvanceX = advance_x;
 
     // Compute rough surface usage metrics (+1 to account for average padding, +0.99 to round)
@@ -4085,7 +4108,9 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, const ImVec2& pos, Im
 
     const ImU32 col_untinted = col | ~IM_COL32_A_MASK;
     const char* word_wrap_eol = NULL;
-
+    
+    const bool outlined = ImGui::imGuiTextOutlined;
+    
     while (s < text_end)
     {
         if (word_wrap_enabled)
@@ -4135,17 +4160,33 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, const ImVec2& pos, Im
         if (glyph->Visible)
         {
             // We don't do a second finer clipping test on the Y axis as we've already skipped anything before clip_rect.y and exit once we pass clip_rect.w
-            float x1 = x + glyph->X0 * scale;
-            float x2 = x + glyph->X1 * scale;
-            float y1 = y + glyph->Y0 * scale;
-            float y2 = y + glyph->Y1 * scale;
+            float x1, y1, x2, y2;
+            if (outlined) {
+                x1 = x + glyph->X0Outlined * scale;
+                y1 = y + glyph->Y0Outlined * scale;
+                x2 = x + glyph->X1Outlined * scale;
+                y2 = y + glyph->Y1Outlined * scale;
+            } else {
+                x1 = x + glyph->X0 * scale;
+                y1 = y + glyph->Y0 * scale;
+                x2 = x + glyph->X1 * scale;
+                y2 = y + glyph->Y1 * scale;
+            }
             if (x1 <= clip_rect.z && x2 >= clip_rect.x)
             {
                 // Render a character
-                float u1 = glyph->U0;
-                float v1 = glyph->V0;
-                float u2 = glyph->U1;
-                float v2 = glyph->V1;
+                float u1, v1, u2, v2;
+                if (outlined) {
+                    u1 = glyph->U0Outlined;
+                    v1 = glyph->V0Outlined;
+                    u2 = glyph->U1Outlined;
+                    v2 = glyph->V1Outlined;
+                } else {
+                    u1 = glyph->U0;
+                    v1 = glyph->V0;
+                    u2 = glyph->U1;
+                    v2 = glyph->V1;
+                }
 
                 // CPU side clipping used to fit text in their frame when the frame is too small. Only does clipping for axis aligned quads.
                 if (cpu_fine_clip)

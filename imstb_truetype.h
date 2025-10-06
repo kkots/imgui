@@ -549,6 +549,7 @@ typedef struct
 {
    float x0,y0,s0,t0; // top-left
    float x1,y1,s1,t1; // bottom-right
+   float s0Outlined, t0Outlined, s1Outlined, t1Outlined;
 } stbtt_aligned_quad;
 
 STBTT_DEF void stbtt_GetBakedQuad(const stbtt_bakedchar *chardata, int pw, int ph,  // same data as above
@@ -3882,6 +3883,11 @@ STBTT_DEF void stbtt_GetBakedQuad(const stbtt_bakedchar *chardata, int pw, int p
    q->s1 = b->x1 * ipw;
    q->t1 = b->y1 * iph;
 
+   q->s0Outlined = (b->x0 - 1.F) * ipw;
+   q->t0Outlined = (b->y0 - 1.F) * iph;
+   q->s1Outlined = (b->x1 + 1.F) * ipw;
+   q->t1Outlined = (b->y1 + 1.F) * iph;
+
    *xpos += b->xadvance;
 }
 
@@ -4391,6 +4397,11 @@ STBTT_DEF void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int
    q->t0 = b->y0 * iph;
    q->s1 = b->x1 * ipw;
    q->t1 = b->y1 * iph;
+
+   q->s0Outlined = (b->x0 - 1.F) * ipw;
+   q->t0Outlined = (b->y0 - 1.F) * iph;
+   q->s1Outlined = (b->x1 + 1.F) * ipw;
+   q->t1Outlined = (b->y1 + 1.F) * iph;
 
    *xpos += b->xadvance;
 }

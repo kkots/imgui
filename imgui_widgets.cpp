@@ -863,6 +863,129 @@ bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
     return pressed;
 }
 
+// Button to close a window
+bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+
+    // Tweak 1: Shrink hit-testing area if button covers an abnormally large proportion of the visible region. That's in order to facilitate moving the window away. (#3825)
+    // This may better be applied as a general hit-rect reduction mechanism for all widgets to ensure the area to move window is always accessible?
+    const float pin_size_resting = 19.F;
+    const float pin_size_pinned = 21.F;
+    const ImRect bb(pos, pos + ImVec2(pin_size_resting, pin_size_resting));
+    ImRect bb_interact = bb;
+    const float area_to_visible_ratio = window->OuterRectClipped.GetArea() / bb.GetArea();
+    if (area_to_visible_ratio < 1.5f)
+        bb_interact.Expand(ImTrunc(bb_interact.GetSize() * -0.25f));
+
+    // Tweak 2: We intentionally allow interaction when clipped so that a mechanical Alt,Right,Activate sequence can always close a window.
+    // (this isn't the common behavior of buttons, but it doesn't affect the user because navigation tends to keep items visible in scrolling layer).
+    bool is_clipped = !ItemAdd(bb_interact, id);
+
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb_interact, id, &hovered, &held);
+    if (is_clipped)
+        return pressed;
+
+    // Render
+    ImU32 bg_col = GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
+    if (hovered)
+        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col);
+    RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_Compact);
+    ImVec2 center = bb.GetCenter();
+    const float pin_texture_width = 45.F;
+    const float pin_texture_height = 46.F;
+    const ImU32 highlightTint = 0x33FFFFFF;
+    if (is_pinned) {
+        ImVec2 start {
+            center.x - pin_size_resting * 0.5F + 5.F,
+            center.y + pin_size_resting * 0.5F - 5.F - pin_size_pinned
+        };
+        ImVec2 end {
+            start.x + pin_size_pinned,
+            start.y + pin_size_pinned
+        };
+        const float pin_pinned_x = 23.F;
+        const float pin_pinned_y = 1.F;
+        window->DrawList->AddImage(
+            TEXID_PIN,
+            start,
+            end,
+            {
+                pin_pinned_x / pin_texture_width,
+                pin_pinned_y / pin_texture_height
+            },
+            {
+                (pin_pinned_x + pin_size_pinned) / pin_texture_width,
+                (pin_pinned_y + pin_size_pinned) / pin_texture_height
+            }
+        );
+        if (hovered) {
+            const float pin_pinned_highlight_x = 23.F;
+            const float pin_pinned_highlight_y = 24.F;
+            window->DrawList->AddImage(
+                TEXID_PIN,
+                start,
+                end,
+                {
+                    pin_pinned_highlight_x / pin_texture_width,
+                    pin_pinned_highlight_y / pin_texture_height
+                },
+                {
+                    (pin_pinned_highlight_x + pin_size_resting) / pin_texture_width,
+                    (pin_pinned_highlight_y + pin_size_resting) / pin_texture_height
+                },
+                highlightTint
+            );
+        }
+    } else {
+        ImVec2 start {
+            center.x - pin_size_resting * 0.5F,
+            center.y - pin_size_resting * 0.5F
+        };
+        ImVec2 end {
+            start.x + pin_size_resting,
+            start.y + pin_size_resting
+        };
+        const float pin_resting_x = 1.F;
+        const float pin_resting_y = 3.F;
+        window->DrawList->AddImage(
+            TEXID_PIN,
+            start,
+            end,
+            {
+                pin_resting_x / pin_texture_width,
+                pin_resting_y / pin_texture_height
+            },
+            {
+                (pin_resting_x + pin_size_resting) / pin_texture_width,
+                (pin_resting_y + pin_size_resting) / pin_texture_height
+            }
+        );
+        if (hovered) {
+            const float pin_resting_highlight_x = 1.F;
+            const float pin_resting_highlight_y = 23.F;
+            window->DrawList->AddImage(
+                TEXID_PIN,
+                start,
+                end,
+                {
+                    pin_resting_highlight_x / pin_texture_width,
+                    pin_resting_highlight_y / pin_texture_height
+                },
+                {
+                    (pin_resting_highlight_x + pin_size_resting) / pin_texture_width,
+                    (pin_resting_highlight_y + pin_size_resting) / pin_texture_height
+                },
+                highlightTint
+            );
+        }
+    }
+
+    return pressed;
+}
+
 bool ImGui::CollapseButton(ImGuiID id, const ImVec2& pos)
 {
     ImGuiContext& g = *GImGui;
@@ -1736,6 +1859,26 @@ bool ImGui::SplitterBehavior(const ImRect& bb, ImGuiID id, ImGuiAxis axis, float
     window->DrawList->AddRectFilled(bb_render.Min, bb_render.Max, col, 0.0f);
 
     return held;
+}
+
+void ImGui::OnWindowPinnedChanged(ImGuiWindow* window, bool is_pinned, int order) {
+    window->IsPinned = is_pinned;
+    window->PinnedOrder = order;
+    BringWindowToDisplayFront(window);
+}
+
+unsigned char ImGui::GetMaxWindowPinnedOrder(ImGuiWindow* window) {
+    ImGuiContext& g = *GImGui;
+    ImVector<ImGuiWindow*>& ar = g.Windows;
+    int order = 0;
+    for (int i = 0; i < ar.Size; ++i) {
+        ImGuiWindow* other = ar[i];
+        if (other == window) continue;
+        if (window->IsPinned) {
+            window->PinnedOrder = order++;
+        }
+    }
+    return order;
 }
 
 static int IMGUI_CDECL ShrinkWidthItemComparer(const void* lhs, const void* rhs)

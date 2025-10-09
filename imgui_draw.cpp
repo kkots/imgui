@@ -174,6 +174,8 @@ using namespace IMGUI_STB_NAMESPACE;
 //-----------------------------------------------------------------------------
 
 bool ImGui::imGuiTextOutlined = false;
+bool ImGui::IsNextWindowPinned = false;
+int ImGui::NextWindowPinnedOrder = 0;
 
 void ImGui::StyleColorsDark(ImGuiStyle* dst)
 {

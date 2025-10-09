@@ -5894,8 +5894,21 @@ static ImGuiWindow* CreateNewWindow(const char* name, ImGuiWindowFlags flags)
 
     if (flags & ImGuiWindowFlags_NoBringToFrontOnFocus)
         g.Windows.push_front(window); // Quite slow but rare and only once
-    else
-        g.Windows.push_back(window);
+    else {
+        ImVector<ImGuiWindow*>& ar = g.Windows;
+        int i;
+        if (window->IsPinned) {
+            for (i = 0; i < ar.Size; ++i) {
+                const ImGuiWindow* other = ar[i];
+                if (other->IsPinned && other->PinnedOrder > window->PinnedOrder) break;
+            }
+        } else {
+            for (i = 0; i < ar.Size; ++i) {
+                if (ar[i]->IsPinned) break;
+            }
+        }
+        ar.insert(ar.Data + i, window);
+    }
 
     return window;
 }
@@ -6469,6 +6482,7 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     ImGuiWindowFlags flags = window->Flags;
 
     const bool has_close_button = (p_open != NULL);
+    const bool has_pin_button = (window->HasPinButton);
     const bool has_collapse_button = !(flags & ImGuiWindowFlags_NoCollapse) && (style.WindowMenuButtonPosition != ImGuiDir_None);
 
     // Close & Collapse button are on the Menu NavLayer and don't default focus (unless there's nothing else on that layer)
@@ -6482,12 +6496,19 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     float pad_l = style.FramePadding.x;
     float pad_r = style.FramePadding.x;
     float button_sz = g.FontSize;
+    float pin_button_sz = 19.F;
     ImVec2 close_button_pos;
+    ImVec2 pin_button_pos;
     ImVec2 collapse_button_pos;
     if (has_close_button)
     {
         close_button_pos = ImVec2(title_bar_rect.Max.x - pad_r - button_sz, title_bar_rect.Min.y + style.FramePadding.y);
         pad_r += button_sz + style.ItemInnerSpacing.x;
+    }
+    if (has_pin_button)
+    {
+        pin_button_pos = ImVec2(title_bar_rect.Max.x - pad_r - pin_button_sz, title_bar_rect.Min.y);
+        pad_r += pin_button_sz + style.ItemInnerSpacing.x;
     }
     if (has_collapse_button && style.WindowMenuButtonPosition == ImGuiDir_Right)
     {
@@ -6509,6 +6530,12 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     if (has_close_button)
         if (CloseButton(window->GetID("#CLOSE"), close_button_pos))
             *p_open = false;
+    
+    if (has_pin_button)
+        if (PinButton(window->GetID("#PIN"), pin_button_pos, window->IsPinned)) {
+            bool new_is_pinned = !window->IsPinned;
+            OnWindowPinnedChanged(window, new_is_pinned, new_is_pinned ? GetMaxWindowPinnedOrder(window) : 0);
+        }
 
     window->DC.NavLayerCurrent = ImGuiNavLayer_Main;
     g.CurrentItemFlags = item_flags_backup;
@@ -6818,6 +6845,11 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         const bool window_just_appearing_after_hidden_for_resize = (window->HiddenFramesCannotSkipItems > 0);
         window->Active = true;
         window->HasCloseButton = (p_open != NULL);
+        window->HasPinButton = flags & ImGuiWindowFlags_HasPinButton;
+        if (ImGui::IsNextWindowPinned != window->IsPinned
+                || window->IsPinned && window->PinnedOrder != ImGui::NextWindowPinnedOrder) {
+            ImGui::OnWindowPinnedChanged(window, ImGui::IsNextWindowPinned, ImGui::NextWindowPinnedOrder);
+        }
         window->ClipRect = ImVec4(-FLT_MAX, -FLT_MAX, +FLT_MAX, +FLT_MAX);
         window->IDStack.resize(1);
         window->DrawList->_ResetForNewFrame();
@@ -7324,6 +7356,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
     window->WriteAccessed = false;
     window->BeginCount++;
     g.NextWindowData.ClearFlags();
+    ImGui::IsNextWindowPinned = false;
 
     // Update visibility
     if (first_begin_of_the_frame && !window->SkipRefresh)
@@ -7473,16 +7506,46 @@ void ImGui::BringWindowToFocusFront(ImGuiWindow* window)
 void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
 {
     ImGuiContext& g = *GImGui;
-    ImGuiWindow* current_front_window = g.Windows.back();
-    if (current_front_window == window || current_front_window->RootWindow == window) // Cheap early out (could be better)
-        return;
-    for (int i = g.Windows.Size - 2; i >= 0; i--) // We can ignore the top-most window
-        if (g.Windows[i] == window)
-        {
-            memmove(&g.Windows[i], &g.Windows[i + 1], (size_t)(g.Windows.Size - i - 1) * sizeof(ImGuiWindow*));
-            g.Windows[g.Windows.Size - 1] = window;
-            break;
+    ImVector<ImGuiWindow*>& ar = g.Windows;
+    int oldIndex = -1;
+    int firstHigherIndex = -1;
+    if (window->IsPinned) {
+        for (int i = 0; i < ar.Size; ++i) {
+            const ImGuiWindow* other = ar[i];
+            if (firstHigherIndex == -1 && other->IsPinned && other->PinnedOrder > window->PinnedOrder) {
+                firstHigherIndex = i;
+            }
+            if (other == window) {
+                oldIndex = i;
+            }
         }
+    } else {
+        for (int i = 0; i < ar.Size; ++i) {
+            const ImGuiWindow* other = ar[i];
+            if (firstHigherIndex == -1 && other->IsPinned) {
+                firstHigherIndex = i;
+            }
+            if (other == window) {
+                oldIndex = i;
+            }
+        }
+    }
+    
+    if (oldIndex == -1) return;
+    
+    if (firstHigherIndex == -1 || oldIndex < firstHigherIndex) {
+        
+        if (firstHigherIndex == -1)
+            firstHigherIndex = ar.Size;
+        
+        if (oldIndex == firstHigherIndex - 1) return;
+        
+        memmove(&ar[oldIndex], &ar[oldIndex + 1], (firstHigherIndex - oldIndex - 1) * sizeof (ImGuiWindow*));
+        ar[firstHigherIndex - 1] = window;
+    } else {
+        memmove(&ar[firstHigherIndex + 1], &ar[firstHigherIndex], (oldIndex - firstHigherIndex) * sizeof (ImGuiWindow*));
+        ar[firstHigherIndex] = window;
+    }
 }
 
 void ImGui::BringWindowToDisplayBack(ImGuiWindow* window)
@@ -8322,6 +8385,10 @@ bool ImGui::IsRectVisible(const ImVec2& rect_min, const ImVec2& rect_max)
 {
     ImGuiWindow* window = GImGui->CurrentWindow;
     return window->ClipRect.Overlaps(ImRect(rect_min, rect_max));
+}
+
+bool ImGui::IsWindowPinned() {
+    return GImGui->CurrentWindow->IsPinned;
 }
 
 //-----------------------------------------------------------------------------

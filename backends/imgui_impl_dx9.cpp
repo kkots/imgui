@@ -262,9 +262,11 @@ void ImGui_ImplDX9_RenderDrawData(ImDrawData* draw_data)
                 // Apply Scissor/clipping rectangle, Bind texture, Draw
                 const RECT r = { (LONG)clip_min.x, (LONG)clip_min.y, (LONG)clip_max.x, (LONG)clip_max.y };
                 const LPDIRECT3DTEXTURE9 texture = bd->TexIDs[pcmd->GetTexID()];
-                bd->pd3dDevice->SetTexture(0, texture);
-                bd->pd3dDevice->SetScissorRect(&r);
-                bd->pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, pcmd->VtxOffset + global_vtx_offset, 0, (UINT)cmd_list->VtxBuffer.Size, pcmd->IdxOffset + global_idx_offset, pcmd->ElemCount / 3);
+                if (texture) {
+                    bd->pd3dDevice->SetTexture(0, texture);
+                    bd->pd3dDevice->SetScissorRect(&r);
+                    bd->pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, pcmd->VtxOffset + global_vtx_offset, 0, (UINT)cmd_list->VtxBuffer.Size, pcmd->IdxOffset + global_idx_offset, pcmd->ElemCount / 3);
+                }
             }
         }
         global_idx_offset += cmd_list->IdxBuffer.Size;

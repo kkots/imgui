@@ -2638,6 +2638,9 @@ struct IMGUI_API ImGuiWindow
     bool                    IsFallbackWindow;                   // Set on the "Debug##Default" window.
     bool                    IsExplicitChild;                    // Set when passed _ChildWindow, left to false by BeginDocked()
     bool                    HasCloseButton;                     // Set when the window has a close button (p_open != NULL)
+    bool                    IsPinned;
+    unsigned char           PinnedOrder;
+    bool                    HasPinButton;
     signed char             ResizeBorderHovered;                // Current border being hovered for resize (-1: none, otherwise 0-3)
     signed char             ResizeBorderHeld;                   // Current border being held for resize (-1: none, otherwise 0-3)
     short                   BeginCount;                         // Number of Begin() during the current frame (generally 0 or 1, 1+ if appending via multiple Begin/End pairs)
@@ -3536,6 +3539,7 @@ namespace ImGui
 
     // Widgets: Window Decorations
     IMGUI_API bool          CloseButton(ImGuiID id, const ImVec2& pos);
+    IMGUI_API bool          PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned);
     IMGUI_API bool          CollapseButton(ImGuiID id, const ImVec2& pos);
     IMGUI_API void          Scrollbar(ImGuiAxis axis);
     IMGUI_API bool          ScrollbarEx(const ImRect& bb, ImGuiID id, ImGuiAxis axis, ImS64* p_scroll_v, ImS64 avail_v, ImS64 contents_v, ImDrawFlags flags);
@@ -3549,6 +3553,8 @@ namespace ImGui
     IMGUI_API bool          DragBehavior(ImGuiID id, ImGuiDataType data_type, void* p_v, float v_speed, const void* p_min, const void* p_max, const char* format, ImGuiSliderFlags flags);
     IMGUI_API bool          SliderBehavior(const ImRect& bb, ImGuiID id, ImGuiDataType data_type, void* p_v, const void* p_min, const void* p_max, const char* format, ImGuiSliderFlags flags, ImRect* out_grab_bb);
     IMGUI_API bool          SplitterBehavior(const ImRect& bb, ImGuiID id, ImGuiAxis axis, float* size1, float* size2, float min_size1, float min_size2, float hover_extend = 0.0f, float hover_visibility_delay = 0.0f, ImU32 bg_col = 0);
+    IMGUI_API void          OnWindowPinnedChanged(ImGuiWindow* window, bool is_pinned, int order);
+    IMGUI_API unsigned char GetMaxWindowPinnedOrder(ImGuiWindow* window);
 
     // Widgets: Tree Nodes
     IMGUI_API bool          TreeNodeBehavior(ImGuiID id, ImGuiTreeNodeFlags flags, const char* label, const char* label_end = NULL);

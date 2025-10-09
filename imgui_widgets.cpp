@@ -897,6 +897,7 @@ bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
     const float pin_texture_width = 45.F;
     const float pin_texture_height = 46.F;
     const ImU32 highlightTint = 0x33FFFFFF;
+    const ImU32 collapsedTint = window->Collapsed ? 0x55FFFFFF : 0xFFFFFFFF;
     if (is_pinned) {
         ImVec2 start {
             center.x - pin_size_resting * 0.5F + 5.F,
@@ -919,7 +920,8 @@ bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
             {
                 (pin_pinned_x + pin_size_pinned) / pin_texture_width,
                 (pin_pinned_y + pin_size_pinned) / pin_texture_height
-            }
+            },
+            collapsedTint
         );
         if (hovered) {
             const float pin_pinned_highlight_x = 23.F;
@@ -961,7 +963,8 @@ bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
             {
                 (pin_resting_x + pin_size_resting) / pin_texture_width,
                 (pin_resting_y + pin_size_resting) / pin_texture_height
-            }
+            },
+            collapsedTint
         );
         if (hovered) {
             const float pin_resting_highlight_x = 1.F;

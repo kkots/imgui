@@ -43,6 +43,7 @@ Index of this file:
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_internal.h"
+#include "PinAtlas.h"
 
 // System includes
 #include <stdint.h>     // intptr_t
@@ -871,9 +872,7 @@ bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
 
     // Tweak 1: Shrink hit-testing area if button covers an abnormally large proportion of the visible region. That's in order to facilitate moving the window away. (#3825)
     // This may better be applied as a general hit-rect reduction mechanism for all widgets to ensure the area to move window is always accessible?
-    const float pin_size_resting = 19.F;
-    const float pin_size_pinned = 21.F;
-    const ImRect bb(pos, pos + ImVec2(pin_size_resting, pin_size_resting));
+    const ImRect bb(pos, pos + ImVec2(PinAtlas::pin_size_resting, PinAtlas::pin_size_resting));
     ImRect bb_interact = bb;
     const float area_to_visible_ratio = window->OuterRectClipped.GetArea() / bb.GetArea();
     if (area_to_visible_ratio < 1.5f)
@@ -894,92 +893,82 @@ bool ImGui::PinButton(ImGuiID id, const ImVec2& pos, bool is_pinned)
         window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_col);
     RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_Compact);
     ImVec2 center = bb.GetCenter();
-    const float pin_texture_width = 45.F;
-    const float pin_texture_height = 46.F;
     const ImU32 highlightTint = 0x33FFFFFF;
     const ImU32 collapsedTint = window->Collapsed ? 0x55FFFFFF : 0xFFFFFFFF;
     if (is_pinned) {
         ImVec2 start {
-            center.x - pin_size_resting * 0.5F + 5.F,
-            center.y + pin_size_resting * 0.5F - 5.F - pin_size_pinned
+            center.x - PinAtlas::pin_size_resting * 0.5F + 5.F,
+            center.y + PinAtlas::pin_size_resting * 0.5F - 5.F - PinAtlas::pin_size_pinned
         };
         ImVec2 end {
-            start.x + pin_size_pinned,
-            start.y + pin_size_pinned
+            start.x + PinAtlas::pin_size_pinned,
+            start.y + PinAtlas::pin_size_pinned
         };
-        const float pin_pinned_x = 23.F;
-        const float pin_pinned_y = 1.F;
         window->DrawList->AddImage(
             TEXID_PIN,
             start,
             end,
             {
-                pin_pinned_x / pin_texture_width,
-                pin_pinned_y / pin_texture_height
+                PinAtlas::pin_pinned_x / PinAtlas::pin_texture_width,
+                PinAtlas::pin_pinned_y / PinAtlas::pin_texture_height
             },
             {
-                (pin_pinned_x + pin_size_pinned) / pin_texture_width,
-                (pin_pinned_y + pin_size_pinned) / pin_texture_height
+                (PinAtlas::pin_pinned_x + PinAtlas::pin_size_pinned) / PinAtlas::pin_texture_width,
+                (PinAtlas::pin_pinned_y + PinAtlas::pin_size_pinned) / PinAtlas::pin_texture_height
             },
             collapsedTint
         );
         if (hovered) {
-            const float pin_pinned_highlight_x = 23.F;
-            const float pin_pinned_highlight_y = 24.F;
             window->DrawList->AddImage(
                 TEXID_PIN,
                 start,
                 end,
                 {
-                    pin_pinned_highlight_x / pin_texture_width,
-                    pin_pinned_highlight_y / pin_texture_height
+                    PinAtlas::pin_pinned_highlight_x / PinAtlas::pin_texture_width,
+                    PinAtlas::pin_pinned_highlight_y / PinAtlas::pin_texture_height
                 },
                 {
-                    (pin_pinned_highlight_x + pin_size_resting) / pin_texture_width,
-                    (pin_pinned_highlight_y + pin_size_resting) / pin_texture_height
+                    (PinAtlas::pin_pinned_highlight_x + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_width,
+                    (PinAtlas::pin_pinned_highlight_y + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_height
                 },
                 highlightTint
             );
         }
     } else {
         ImVec2 start {
-            center.x - pin_size_resting * 0.5F,
-            center.y - pin_size_resting * 0.5F
+            center.x - PinAtlas::pin_size_resting * 0.5F,
+            center.y - PinAtlas::pin_size_resting * 0.5F
         };
         ImVec2 end {
-            start.x + pin_size_resting,
-            start.y + pin_size_resting
+            start.x + PinAtlas::pin_size_resting,
+            start.y + PinAtlas::pin_size_resting
         };
-        const float pin_resting_x = 1.F;
-        const float pin_resting_y = 3.F;
         window->DrawList->AddImage(
             TEXID_PIN,
             start,
             end,
             {
-                pin_resting_x / pin_texture_width,
-                pin_resting_y / pin_texture_height
+                PinAtlas::pin_resting_x / PinAtlas::pin_texture_width,
+                PinAtlas::pin_resting_y / PinAtlas::pin_texture_height
             },
             {
-                (pin_resting_x + pin_size_resting) / pin_texture_width,
-                (pin_resting_y + pin_size_resting) / pin_texture_height
+                (PinAtlas::pin_resting_x + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_width,
+                (PinAtlas::pin_resting_y + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_height
             },
             collapsedTint
         );
         if (hovered) {
-            const float pin_resting_highlight_x = 1.F;
-            const float pin_resting_highlight_y = 23.F;
             window->DrawList->AddImage(
                 TEXID_PIN,
                 start,
                 end,
                 {
-                    pin_resting_highlight_x / pin_texture_width,
-                    pin_resting_highlight_y / pin_texture_height
+                    PinAtlas::pin_resting_highlight_x / PinAtlas::pin_texture_width,
+                    PinAtlas::pin_resting_highlight_y / PinAtlas::pin_texture_height
                 },
                 {
-                    (pin_resting_highlight_x + pin_size_resting) / pin_texture_width,
-                    (pin_resting_highlight_y + pin_size_resting) / pin_texture_height
+                    (PinAtlas::pin_resting_highlight_x + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_width,
+                    (PinAtlas::pin_resting_highlight_y + PinAtlas::pin_size_resting) / PinAtlas::pin_texture_height
                 },
                 highlightTint
             );

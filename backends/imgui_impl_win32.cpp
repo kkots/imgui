@@ -409,11 +409,8 @@ void    ImGui_ImplWin32_NewFrame()
 
     // Update OS mouse cursor with the cursor requested by imgui
     ImGuiMouseCursor mouse_cursor = io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
-    if (bd->LastMouseCursor != mouse_cursor)
-    {
-        bd->LastMouseCursor = mouse_cursor;
-        ImGui_ImplWin32_UpdateMouseCursor();
-    }
+    bd->LastMouseCursor = mouse_cursor;
+    ImGui_ImplWin32_UpdateMouseCursor();
 
     // Update game controllers (if enabled and available)
     ImGui_ImplWin32_UpdateGamepads();

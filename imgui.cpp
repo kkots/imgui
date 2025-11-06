@@ -10604,6 +10604,12 @@ void ImGui::SetCursorScreenPos(const ImVec2& pos)
     window->DC.IsSetPos = true;
 }
 
+bool ImGui::WindowIsNotNull()
+{
+    ImGuiWindow* window = GetCurrentWindowRead();
+    return window != nullptr;
+}
+
 // User generally sees positions in window coordinates. Internally we store CursorPos in absolute screen coordinates because it is more convenient.
 // Conversion happens as we pass the value to user, but it makes our naming convention confusing because GetCursorPos() == (DC.CursorPos - window.Pos). May want to rename 'DC.CursorPos'.
 ImVec2 ImGui::GetCursorPos()
@@ -11537,7 +11543,7 @@ bool ImGui::BeginPopup(const char* str_id, ImGuiWindowFlags flags)
         return false;
     }
     flags |= ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings;
-    ImGuiID id = g.CurrentWindow->GetID(str_id);
+    ImGuiID id = g.CurrentWindow ? g.CurrentWindow->GetID(str_id) : ImHashStr(str_id, 0, 0);
     return BeginPopupEx(id, flags);
 }
 

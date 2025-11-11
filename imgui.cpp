@@ -5897,14 +5897,18 @@ static ImGuiWindow* CreateNewWindow(const char* name, ImGuiWindowFlags flags)
     else {
         ImVector<ImGuiWindow*>& ar = g.Windows;
         int i;
-        if (window->IsPinned) {
-            for (i = 0; i < ar.Size; ++i) {
-                const ImGuiWindow* other = ar[i];
-                if (other->IsPinned && other->PinnedOrder > window->PinnedOrder) break;
+        if (window->IsPinned || (window->Flags & ImGuiWindowFlags_Popup)) {
+            if (window->Flags & ImGuiWindowFlags_Popup) {
+                i = ar.Size;
+            } else {
+                for (i = 0; i < ar.Size; ++i) {
+                    const ImGuiWindow* other = ar[i];
+                    if (other->IsPinned && other->PinnedOrder > window->PinnedOrder) break;
+                }
             }
         } else {
             for (i = 0; i < ar.Size; ++i) {
-                if (ar[i]->IsPinned) break;
+                if (ar[i]->IsPinned || (window->Flags & ImGuiWindowFlags_Popup)) break;
             }
         }
         ar.insert(ar.Data + i, window);
@@ -7509,10 +7513,14 @@ void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
     ImVector<ImGuiWindow*>& ar = g.Windows;
     int oldIndex = -1;
     int firstHigherIndex = -1;
-    if (window->IsPinned) {
+    bool windowIsPopup = window->Flags & ImGuiWindowFlags_Popup;
+    if (window->IsPinned || windowIsPopup) {
         for (int i = 0; i < ar.Size; ++i) {
             const ImGuiWindow* other = ar[i];
-            if (firstHigherIndex == -1 && other->IsPinned && other->PinnedOrder > window->PinnedOrder) {
+            if (firstHigherIndex == -1
+                    && !windowIsPopup
+                    && other->IsPinned
+                    && other->PinnedOrder > window->PinnedOrder) {
                 firstHigherIndex = i;
             }
             if (other == window) {
@@ -7522,7 +7530,7 @@ void ImGui::BringWindowToDisplayFront(ImGuiWindow* window)
     } else {
         for (int i = 0; i < ar.Size; ++i) {
             const ImGuiWindow* other = ar[i];
-            if (firstHigherIndex == -1 && other->IsPinned) {
+            if (firstHigherIndex == -1 && (other->IsPinned || (other->Flags & ImGuiWindowFlags_Popup))) {
                 firstHigherIndex = i;
             }
             if (other == window) {

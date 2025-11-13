@@ -2206,6 +2206,34 @@ ImGuiID ImHashStr(const char* data_p, size_t data_size, ImGuiID seed)
 ImFileHandle ImFileOpen(const char* filename, const char* mode)
 {
 #if defined(_WIN32) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS) && !defined(__CYGWIN__) && !defined(__GNUC__)
+
+    bool isRelative = true;
+    for (const char* ptr = filename; *ptr != '\0'; ++ptr) {
+        if (*ptr == '\\') {
+            isRelative = false;
+            break;
+        }
+    }
+    
+    wchar_t binPath[MAX_PATH];
+    int binPathLen = 0;
+    if (isRelative) {
+        HMODULE ggxrd = GetModuleHandleA("GuiltyGearXrd.exe");
+        GetModuleFileNameW(ggxrd, binPath, MAX_PATH);
+        binPathLen = (int)wcslen(binPath);
+        wchar_t* ptr;
+        for (ptr = binPath + binPathLen - 1; ptr >= binPath; --ptr) {
+            if (*ptr == L'\\') break;
+        }
+        ++ptr;
+        if (binPathLen > ptr - binPath) {
+            memset(ptr, 0, (
+                binPathLen - (ptr - binPath)
+            ) * sizeof (wchar_t));
+            binPathLen = ptr - binPath;
+        }
+    }
+    
     // We need a fopen() wrapper because MSVC/Windows fopen doesn't handle UTF-8 filenames.
     // Previously we used ImTextCountCharsFromUtf8/ImTextStrFromUtf8 here but we now need to support ImWchar16 and ImWchar32!
     const int filename_wsize = ::MultiByteToWideChar(CP_UTF8, 0, filename, -1, NULL, 0);
@@ -2215,14 +2243,18 @@ ImFileHandle ImFileOpen(const char* filename, const char* mode)
     // We don't rely on current ImGuiContext as this is implied to be a helper function which doesn't depend on it (see #7314).
     wchar_t local_temp_stack[FILENAME_MAX];
     ImVector<wchar_t> local_temp_heap;
-    if (filename_wsize + mode_wsize > IM_ARRAYSIZE(local_temp_stack))
-        local_temp_heap.resize(filename_wsize + mode_wsize);
+    if (binPathLen + filename_wsize + mode_wsize > IM_ARRAYSIZE(local_temp_stack))
+        local_temp_heap.resize(binPathLen + filename_wsize + mode_wsize);
     wchar_t* filename_wbuf = local_temp_heap.Data ? local_temp_heap.Data : local_temp_stack;
-    wchar_t* mode_wbuf = filename_wbuf + filename_wsize;
-    ::MultiByteToWideChar(CP_UTF8, 0, filename, -1, filename_wbuf, filename_wsize);
+    wchar_t* mode_wbuf = filename_wbuf + binPathLen + filename_wsize;
+    if (binPathLen) {
+        memcpy(filename_wbuf, binPath, binPathLen * sizeof (wchar_t));
+    }
+    ::MultiByteToWideChar(CP_UTF8, 0, filename, -1, filename_wbuf + binPathLen, filename_wsize);
     ::MultiByteToWideChar(CP_UTF8, 0, mode, -1, mode_wbuf, mode_wsize);
     return ::_wfopen(filename_wbuf, mode_wbuf);
 #else
+    #error implement relative paths going to xrd's binaries\win32 path, mister mingw user
     return fopen(filename, mode);
 #endif
 }

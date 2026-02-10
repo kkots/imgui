@@ -3092,6 +3092,8 @@ struct ImDrawList
     IMGUI_API void  AddPolyline(const ImVec2* points, int num_points, ImU32 col, ImDrawFlags flags, float thickness);
     IMGUI_API void  AddConvexPolyFilled(const ImVec2* points, int num_points, ImU32 col);
     IMGUI_API void  AddConcavePolyFilled(const ImVec2* points, int num_points, ImU32 col);
+    IMGUI_API void  AddPolylineClosedLoop(const ImVec2* points, int num_points, ImU32 col, float thickness);
+    IMGUI_API void  AddPolylineCached(const ImVec2* pointsOuter, const ImVec2* pointsInner, int num_points, ImU32 col);
 
     // Image primitives
     // - Read FAQ to understand what ImTextureID is.
@@ -3100,6 +3102,23 @@ struct ImDrawList
     IMGUI_API void  AddImage(ImTextureID user_texture_id, const ImVec2& p_min, const ImVec2& p_max, const ImVec2& uv_min = ImVec2(0, 0), const ImVec2& uv_max = ImVec2(1, 1), ImU32 col = IM_COL32_WHITE);
     IMGUI_API void  AddImageQuad(ImTextureID user_texture_id, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, const ImVec2& p4, const ImVec2& uv1 = ImVec2(0, 0), const ImVec2& uv2 = ImVec2(1, 0), const ImVec2& uv3 = ImVec2(1, 1), const ImVec2& uv4 = ImVec2(0, 1), ImU32 col = IM_COL32_WHITE);
     IMGUI_API void  AddImageRounded(ImTextureID user_texture_id, const ImVec2& p_min, const ImVec2& p_max, const ImVec2& uv_min, const ImVec2& uv_max, ImU32 col, float rounding, ImDrawFlags flags = 0);
+    IMGUI_API void  AddImageHex(
+        ImTextureID user_texture_id,
+        const ImVec2& p1,
+        const ImVec2& p2,
+        const ImVec2& p3,
+        const ImVec2& p4,
+        const ImVec2& p5,
+        const ImVec2& p6,
+        const ImVec2& pCenter,
+        const ImVec2& uv1,
+        const ImVec2& uv2,
+        const ImVec2& uv3,
+        const ImVec2& uv4,
+        const ImVec2& uv5,
+        const ImVec2& uv6,
+        const ImVec2& uvCenter,
+        ImU32 col);
 
     // Stateful path API, add points then finish with PathFillConvex() or PathStroke()
     // - Important: filled shapes must always use clockwise winding order! The anti-aliasing fringe depends on it. Counter-clockwise shapes will have "inward" anti-aliasing.
@@ -3139,6 +3158,22 @@ struct ImDrawList
     IMGUI_API void  PrimUnreserve(int idx_count, int vtx_count);
     IMGUI_API void  PrimRect(const ImVec2& a, const ImVec2& b, ImU32 col);      // Axis aligned rectangle (composed of two triangles)
     IMGUI_API void  PrimRectUV(const ImVec2& a, const ImVec2& b, const ImVec2& uv_a, const ImVec2& uv_b, ImU32 col);
+    IMGUI_API void  PrimHexUV(
+        const ImVec2& p1,
+        const ImVec2& p2,
+        const ImVec2& p3,
+        const ImVec2& p4,
+        const ImVec2& p5,
+        const ImVec2& p6,
+        const ImVec2& pCenter,
+        const ImVec2& uv1,
+        const ImVec2& uv2,
+        const ImVec2& uv3,
+        const ImVec2& uv4,
+        const ImVec2& uv5,
+        const ImVec2& uv6,
+        const ImVec2& uvCenter,
+        ImU32 col);
     IMGUI_API void  PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, const ImVec2& uv_a, const ImVec2& uv_b, const ImVec2& uv_c, const ImVec2& uv_d, ImU32 col);
     inline    void  PrimWriteVtx(const ImVec2& pos, const ImVec2& uv, ImU32 col)    { _VtxWritePtr->pos = pos; _VtxWritePtr->uv = uv; _VtxWritePtr->col = col; _VtxWritePtr++; _VtxCurrentIdx++; }
     inline    void  PrimWriteIdx(ImDrawIdx idx)                                     { *_IdxWritePtr = idx; _IdxWritePtr++; }

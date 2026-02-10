@@ -706,6 +706,43 @@ void ImDrawList::PrimRectUV(const ImVec2& a, const ImVec2& c, const ImVec2& uv_a
     _IdxWritePtr += 6;
 }
 
+void ImDrawList::PrimHexUV(
+        const ImVec2& p1,
+        const ImVec2& p2,
+        const ImVec2& p3,
+        const ImVec2& p4,
+        const ImVec2& p5,
+        const ImVec2& p6,
+        const ImVec2& pCenter,
+        const ImVec2& uv1,
+        const ImVec2& uv2,
+        const ImVec2& uv3,
+        const ImVec2& uv4,
+        const ImVec2& uv5,
+        const ImVec2& uv6,
+        const ImVec2& uvCenter,
+        ImU32 col)
+{
+    ImDrawIdx idx = (ImDrawIdx)_VtxCurrentIdx;
+    ImDrawIdx idxCenter = idx + 6;
+    _IdxWritePtr[0] = idx; _IdxWritePtr[1] = (ImDrawIdx)(idx+1); _IdxWritePtr[2] = idxCenter;
+    _IdxWritePtr[3] = (ImDrawIdx)(idx+1); _IdxWritePtr[4] = (ImDrawIdx)(idx+2); _IdxWritePtr[5] = idxCenter;
+    _IdxWritePtr[6] = (ImDrawIdx)(idx+2); _IdxWritePtr[7] = (ImDrawIdx)(idx+3); _IdxWritePtr[8] = idxCenter;
+    _IdxWritePtr[9] = (ImDrawIdx)(idx+3); _IdxWritePtr[10] = (ImDrawIdx)(idx+4); _IdxWritePtr[11] = idxCenter;
+    _IdxWritePtr[12] = (ImDrawIdx)(idx+4); _IdxWritePtr[13] = (ImDrawIdx)(idx+5); _IdxWritePtr[14] = idxCenter;
+    _IdxWritePtr[15] = (ImDrawIdx)(idx+5); _IdxWritePtr[16] = idx; _IdxWritePtr[17] = idxCenter;
+    _VtxWritePtr[0].pos = p1; _VtxWritePtr[0].uv = uv1; _VtxWritePtr[0].col = col;
+    _VtxWritePtr[1].pos = p2; _VtxWritePtr[1].uv = uv2; _VtxWritePtr[1].col = col;
+    _VtxWritePtr[2].pos = p3; _VtxWritePtr[2].uv = uv3; _VtxWritePtr[2].col = col;
+    _VtxWritePtr[3].pos = p4; _VtxWritePtr[3].uv = uv4; _VtxWritePtr[3].col = col;
+    _VtxWritePtr[4].pos = p5; _VtxWritePtr[4].uv = uv5; _VtxWritePtr[4].col = col;
+    _VtxWritePtr[5].pos = p6; _VtxWritePtr[5].uv = uv6; _VtxWritePtr[5].col = col;
+    _VtxWritePtr[6].pos = pCenter; _VtxWritePtr[6].uv = uvCenter; _VtxWritePtr[6].col = col;
+    _VtxWritePtr += 7;
+    _VtxCurrentIdx += 7;
+    _IdxWritePtr += 18;
+}
+
 void ImDrawList::PrimQuadUV(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, const ImVec2& uv_a, const ImVec2& uv_b, const ImVec2& uv_c, const ImVec2& uv_d, ImU32 col)
 {
     ImDrawIdx idx = (ImDrawIdx)_VtxCurrentIdx;
@@ -982,6 +1019,97 @@ void ImDrawList::AddPolyline(const ImVec2* points, const int points_count, ImU32
             _IdxWritePtr += 6;
             _VtxCurrentIdx += 4;
         }
+    }
+}
+
+void ImDrawList::AddPolylineClosedLoop(const ImVec2* points, const int points_count, ImU32 col, float thickness)
+{
+    if (points_count < 2 || (col & IM_COL32_A_MASK) == 0)
+        return;
+
+    const ImVec2 opaque_uv = _Data->TexUvWhitePixel;
+
+    // [PATH 4] Non texture-based, Non anti-aliased lines
+    const int idx_count = points_count * 6;
+    const int vtx_count = points_count * 2;
+    PrimReserve(idx_count, vtx_count);
+    
+    const ImDrawIdx VtxStartingIdx = _VtxCurrentIdx;
+    
+    for (int i1 = 0; i1 < points_count; i1++)
+    {
+        const int i0 = i1 == 0 ? points_count - 1 : i1 - 1;
+        const int i2 = (i1 + 1) == points_count ? 0 : i1 + 1;
+        const ImVec2& p0 = points[i0];
+        const ImVec2& p1 = points[i1];
+        const ImVec2& p2 = points[i2];
+
+        float dx1_2 = p2.x - p1.x;
+        float dy1_2 = p2.y - p1.y;
+        float dx0_1 = p1.x - p0.x;
+        float dy0_1 = p1.y - p0.y;
+        float sqLen1_2 = dx1_2 * dx1_2 + dy1_2 * dy1_2;
+        float sqLen0_1 = dx0_1 * dx0_1 + dy0_1 * dy0_1;
+        char store_ps_result[
+            (
+                sizeof(float)
+            ) * 4
+            + 15
+        ];
+        float* const store_ps_result_aligned = (float*)(
+            ((uintptr_t)store_ps_result + 15) & ~15
+        );
+        _mm_store_ps(store_ps_result_aligned, _mm_rsqrt_ps(_mm_set_ps(0.F, 0.F, sqLen0_1, sqLen1_2)));
+        float sumX = store_ps_result_aligned[0] * dx1_2 + store_ps_result_aligned[1] * dx0_1;
+        float sumY = store_ps_result_aligned[0] * dy1_2 + store_ps_result_aligned[1] * dy0_1;
+        float sumRLen = ImRsqrt(sumX * sumX + sumY * sumY);
+        const float reusable = sumRLen * thickness * sumRLen;
+        // just assume we go clockwise
+        float outerX = -sumY * reusable;
+        float outerY = sumX * reusable;
+        float innerX = -outerX;
+        float innerY = -outerY;
+
+        _VtxWritePtr[0].pos.x = p1.x + innerX; _VtxWritePtr[0].pos.y = p1.y + innerY; _VtxWritePtr[0].uv = opaque_uv; _VtxWritePtr[0].col = col;
+        _VtxWritePtr[1].pos.x = p1.x + outerX; _VtxWritePtr[1].pos.y = p1.y + outerY; _VtxWritePtr[1].uv = opaque_uv; _VtxWritePtr[1].col = col;
+        _VtxWritePtr += 2;
+        
+        ImDrawIdx VtxNextIdx = (i1 + 1) == points_count ? VtxStartingIdx : _VtxCurrentIdx + 2;
+        _IdxWritePtr[0] = (ImDrawIdx)(_VtxCurrentIdx); _IdxWritePtr[1] = (ImDrawIdx)(_VtxCurrentIdx + 1); _IdxWritePtr[2] = (ImDrawIdx)(VtxNextIdx);
+        _IdxWritePtr[3] = (ImDrawIdx)(_VtxCurrentIdx); _IdxWritePtr[4] = (ImDrawIdx)(VtxNextIdx + 1); _IdxWritePtr[5] = (ImDrawIdx)(VtxNextIdx);
+        _IdxWritePtr += 6;
+        _VtxCurrentIdx += 2;
+    }
+}
+
+void ImDrawList::AddPolylineCached(const ImVec2* pointsOuter, const ImVec2* pointsInner, int num_points, ImU32 col)
+{
+    if (num_points < 2 || (col & IM_COL32_A_MASK) == 0)
+        return;
+
+    const ImVec2 opaque_uv = _Data->TexUvWhitePixel;
+
+    // [PATH 4] Non texture-based, Non anti-aliased lines
+    const int idx_count = num_points * 6;
+    const int vtx_count = num_points * 2;
+    PrimReserve(idx_count, vtx_count);
+    
+    const ImDrawIdx VtxStartingIdx = _VtxCurrentIdx;
+    
+    for (int i = 0; i < num_points; i++)
+    {
+        const ImVec2& pntOuter = pointsOuter[i];
+        const ImVec2& pntInner = pointsInner[i];
+        
+        _VtxWritePtr[0].pos.x = pntInner.x; _VtxWritePtr[0].pos.y = pntInner.y; _VtxWritePtr[0].uv = opaque_uv; _VtxWritePtr[0].col = col;
+        _VtxWritePtr[1].pos.x = pntOuter.x; _VtxWritePtr[1].pos.y = pntOuter.y; _VtxWritePtr[1].uv = opaque_uv; _VtxWritePtr[1].col = col;
+        _VtxWritePtr += 2;
+        
+        ImDrawIdx VtxNextIdx = (i + 1) == num_points ? VtxStartingIdx : _VtxCurrentIdx + 2;
+        _IdxWritePtr[0] = (ImDrawIdx)(_VtxCurrentIdx); _IdxWritePtr[1] = (ImDrawIdx)(_VtxCurrentIdx + 1); _IdxWritePtr[2] = (ImDrawIdx)(VtxNextIdx + 1);
+        _IdxWritePtr[3] = (ImDrawIdx)(_VtxCurrentIdx); _IdxWritePtr[4] = (ImDrawIdx)(VtxNextIdx + 1); _IdxWritePtr[5] = (ImDrawIdx)(VtxNextIdx);
+        _IdxWritePtr += 6;
+        _VtxCurrentIdx += 2;
     }
 }
 
@@ -1676,6 +1804,38 @@ void ImDrawList::AddImage(ImTextureID user_texture_id, const ImVec2& p_min, cons
 
     PrimReserve(6, 4);
     PrimRectUV(p_min, p_max, uv_min, uv_max, col);
+
+    if (push_texture_id)
+        PopTextureID();
+}
+
+void ImDrawList::AddImageHex(
+        ImTextureID user_texture_id,
+        const ImVec2& p1,
+        const ImVec2& p2,
+        const ImVec2& p3,
+        const ImVec2& p4,
+        const ImVec2& p5,
+        const ImVec2& p6,
+        const ImVec2& pCenter,
+        const ImVec2& uv1,
+        const ImVec2& uv2,
+        const ImVec2& uv3,
+        const ImVec2& uv4,
+        const ImVec2& uv5,
+        const ImVec2& uv6,
+        const ImVec2& uvCenter,
+        ImU32 col)
+{
+    if ((col & IM_COL32_A_MASK) == 0)
+        return;
+
+    const bool push_texture_id = user_texture_id != _CmdHeader.TextureId;
+    if (push_texture_id)
+        PushTextureID(user_texture_id);
+
+    PrimReserve(18, 7);
+    PrimHexUV(p1, p2, p3, p4, p5, p6, pCenter, uv1, uv2, uv3, uv4, uv5, uv6, uvCenter, col);
 
     if (push_texture_id)
         PopTextureID();

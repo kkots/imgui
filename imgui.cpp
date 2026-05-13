@@ -2205,7 +2205,7 @@ ImGuiID ImHashStr(const char* data_p, size_t data_size, ImGuiID seed)
 
 ImFileHandle ImFileOpen(const char* filename, const char* mode)
 {
-#if defined(_WIN32) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS) && !defined(__CYGWIN__) && !defined(__GNUC__)
+#if defined(_WIN32) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 
     bool isRelative = true;
     for (const char* ptr = filename; *ptr != '\0'; ++ptr) {
@@ -2254,7 +2254,7 @@ ImFileHandle ImFileOpen(const char* filename, const char* mode)
     ::MultiByteToWideChar(CP_UTF8, 0, mode, -1, mode_wbuf, mode_wsize);
     return ::_wfopen(filename_wbuf, mode_wbuf);
 #else
-    #error implement relative paths going to xrd's binaries\win32 path, mister mingw user
+    #error "don't want this to happen"
     return fopen(filename, mode);
 #endif
 }
